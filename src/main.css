@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Pixel-matrix background */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px);
+  background-size: 4px 4px;
+  opacity: 0.08;
+  pointer-events: none;
+  z-index: -2;
+}
+
+/* Neon blob */
+body::after {
+  content: "";
+  position: fixed;
+  width: 600px;
+  height: 600px;
+  background: #00e56d;
+  filter: blur(120px);
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0.18;
+  pointer-events: none;
+  z-index: -3;
+}
