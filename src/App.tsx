@@ -6,6 +6,7 @@ import CommunityAnalysis from './components/CommunityAnalysis';
 import { getRecipientAddresses } from './services/alchemyService';
 import { getRipFunProfiles } from './services/ripfunService';
 import { getCommunityAnalysis } from './services/geminiService';
+import { getLeaderboardFromBackend } from './services/leaderboardService';
 
 export interface UserRecord {
   walletAddress: string;
@@ -50,11 +51,20 @@ export default function App() {
     setError(null);
     setAnalysis(null);
     try {
-      // 1. Get transfer counts
-      const addressCounts = await getRecipientAddresses({
-        contractAddress: NFT_CONTRACT_ADDRESS,
-        fromAddress: MINT_FROM_ADDRESS
-      });
+      // 1. Try backend first
+      let addressCounts: Map<string, number>;
+      const backendResp = await getLeaderboardFromBackend();
+      if (backendResp && backendResp.data.length) {
+        addressCounts = new Map(
+          backendResp.data.map((e) => [e.walletAddress, e.transferCount] as const)
+        );
+      } else {
+        // Fallback to client-side aggregation
+        addressCounts = await getRecipientAddresses({
+          contractAddress: NFT_CONTRACT_ADDRESS,
+          fromAddress: MINT_FROM_ADDRESS
+        });
+      }
 
       // 2. Sort addresses by count desc
       const sortedAddrs = Array.from(addressCounts.entries())
