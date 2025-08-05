@@ -4,7 +4,7 @@ import { base } from 'viem/chains';
 const ALCHEMY_KEY = import.meta.env.VITE_ALCHEMY_API_KEY as string | undefined;
 
 if (!ALCHEMY_KEY) {
-  console.warn('Missing VITE_ALCHEMY_API_KEY env var');
+  console.warn('No client-side Alchemy key - using backend-only mode');
 }
 
 interface GetRecipientParams {
@@ -13,6 +13,11 @@ interface GetRecipientParams {
 }
 
 export async function getRecipientAddresses({ contractAddress, fromAddress }: GetRecipientParams): Promise<Map<string, number>> {
+  if (!ALCHEMY_KEY) {
+    console.error('Client-side Alchemy fallback unavailable - no API key');
+    return new Map();
+  }
+
   const client: PublicClient = createPublicClient({
     chain: base,
     transport: http(`https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`)
