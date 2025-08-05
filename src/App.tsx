@@ -3,8 +3,6 @@ import Header from './components/Header';
 import Loader from './components/Loader';
 import ResultsTable from './components/ResultsTable';
 import CommunityAnalysis from './components/CommunityAnalysis';
-import { getRecipientAddresses } from './services/alchemyService';
-import { getRipFunProfiles } from './services/ripfunService';
 import { getCommunityAnalysis } from './services/geminiService';
 import { getLeaderboardFromBackend } from './services/leaderboardService';
 
@@ -22,8 +20,6 @@ interface CachePayload {
 }
 
 const CACHE_KEY = 'ripfunLeaderboardCache';
-const NFT_CONTRACT_ADDRESS = '0x6292bf78996e189bAd8f9CF3e3Cb31017bb70540';
-const MINT_FROM_ADDRESS = '0xeBeA10BCd609d3F6fb2Ea104baB638396C037388';
 
 export default function App() {
   const [users, setUsers] = useState<UserRecord[] | null>(null);
@@ -89,48 +85,8 @@ export default function App() {
           JSON.stringify({ timestamp: serverFetchTime, users: enriched } satisfies CachePayload)
         );
       } else {
-        // Fallback to client-side aggregation + enrichment
-        setLoading('Fetching transfers…');
-        const addressCounts = await getRecipientAddresses({
-          contractAddress: NFT_CONTRACT_ADDRESS,
-          fromAddress: MINT_FROM_ADDRESS
-        });
-
-        // Sort addresses by count desc
-        const sortedAddrs = Array.from(addressCounts.entries())
-          .sort((a, b) => b[1] - a[1])
-          .map(([address]) => address);
-
-        // Batch enrich profiles (20 at a time)
-        const batchSize = 20;
-        enriched = [];
-        for (let i = 0; i < sortedAddrs.length; i += batchSize) {
-          setLoading(`Enriching profiles ${i} / ${sortedAddrs.length}`);
-          const slice = sortedAddrs.slice(i, i + batchSize);
-          const profiles = await getRipFunProfiles(slice);
-          slice.forEach((addr) => {
-            const profile = profiles.get(addr);
-            enriched.push({
-              walletAddress: addr,
-              username: profile?.username || null,
-              avatar: profile?.avatar || null,
-              profileUrl: profile?.profileUrl || null,
-              transferCount: addressCounts.get(addr) || 0
-            });
-          });
-        }
-
-        // Sort enriched list
-        enriched.sort((a, b) => b.transferCount - a.transferCount);
-        
-        // For client-side fallback, use current time
-        const fetchTime = Date.now();
-        setUsers(enriched);
-        setLastFetchTime(fetchTime);
-        localStorage.setItem(
-          CACHE_KEY,
-          JSON.stringify({ timestamp: fetchTime, users: enriched } satisfies CachePayload)
-        );
+        // Backend unavailable - show error instead of client fallback
+        throw new Error('Backend service unavailable. Please try again later.');
       }
 
       // 5. Optional AI analysis

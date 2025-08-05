@@ -5,15 +5,13 @@
     "lib": ["ES2022", "DOM"],
     "jsx": "react-jsx",
     "moduleResolution": "bundler",
-    "outDir": "dist",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "allowSyntheticDefaultImports": true,
 
-    "types": ["vite/client", "node"]
+    "types": ["vite/client"]
   },
-  "include": ["src", "server"],
-  "exclude": ["dist"]
+  "include": ["src"],
+  "exclude": ["dist", "server"]
 }

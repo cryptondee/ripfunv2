@@ -5,10 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && node dist/server/simple.js",
-    "build:frontend": "vite build",
-    "build:backend": "tsc",
-    "start": "node dist/server/simple.js",
+    "build": "vite build",
     "start:backend": "ts-node server/simple.ts",
     "preview": "vite preview"
   },
