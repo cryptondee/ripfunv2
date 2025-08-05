@@ -15,9 +15,8 @@ This is a React + Vite frontend application with an optional Express backend tha
 - **Data Flow**: Client-side blockchain aggregation → Profile enrichment → Optional AI analysis
 
 ### Backend (Optional)
-Two backend implementations are available:
-- `server/index.ts`: Basic Express server with in-memory caching using raw Viem RPC calls
-- `server/simple.ts`: Feature-complete Express server using Alchemy SDK with profile enrichment
+The backend implementation:
+- `server/simple.ts`: Production Express server using Alchemy SDK with profile enrichment and server-side caching
 
 The backend provides a `/leaderboard` endpoint that aggregates data server-side and caches results for 1 hour.
 
@@ -64,8 +63,9 @@ Located in `src/App.tsx`:
 - Aggregates transfer counts by recipient address with checksum validation
 
 ### Rip.fun Service (`src/services/ripfunService.ts`)
-- Batches profile requests with retry logic and exponential backoff
+- Client-side fallback for profile requests (when backend unavailable)
 - Uses CORS proxy (`https://corsproxy.io/`) for client-side API access
+- Batches profile requests with retry logic and exponential backoff
 - Handles rate limiting (429) and server errors gracefully
 
 ### Leaderboard Service (`src/services/leaderboardService.ts`)

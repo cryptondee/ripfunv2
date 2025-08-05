@@ -9,6 +9,8 @@ const CORS_PROXY = 'https://corsproxy.io/?';
 
 /**
  * Fetch profile data for a list of addresses in parallel with retries.
+ * NOTE: This is fallback-only. Primary profile enrichment happens server-side.
+ * Uses CORS proxy for client-side access when backend is unavailable.
  */
 export async function getRipFunProfiles(addresses: string[]): Promise<Map<string, RipFunProfile>> {
   const out = new Map<string, RipFunProfile>();

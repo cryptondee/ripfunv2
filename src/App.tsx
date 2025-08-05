@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Header from './components/Header';
 import Loader from './components/Loader';
 import ResultsTable from './components/ResultsTable';
@@ -60,13 +60,8 @@ export default function App() {
   }, []);
 
   const fetchLeaderboard = useCallback(async () => {
-    // Check cooldown period
-    if (lastFetchTime && Date.now() - lastFetchTime < 1000 * 60 * 60) {
-      const remainingMinutes = Math.ceil((1000 * 60 * 60 - (Date.now() - lastFetchTime)) / (1000 * 60));
-      setError(`Please wait ${remainingMinutes} more minute(s) before refreshing.`);
-      return;
-    }
-
+    // Only show error if user tries to refresh during cooldown, but still allow the call to proceed
+    // (the backend will return cached data anyway)
     setLoading('Fetching transfers…');
     setError(null);
     setAnalysis(null);
@@ -85,6 +80,14 @@ export default function App() {
           profileUrl: entry.profileUrl,
           transferCount: entry.transferCount
         }));
+        // Use server's timestamp, not local fetch time
+        const serverFetchTime = backendResp.updatedAt;
+        setUsers(enriched);
+        setLastFetchTime(serverFetchTime);
+        localStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({ timestamp: serverFetchTime, users: enriched } satisfies CachePayload)
+        );
       } else {
         // Fallback to client-side aggregation + enrichment
         setLoading('Fetching transfers…');
@@ -119,14 +122,16 @@ export default function App() {
 
         // Sort enriched list
         enriched.sort((a, b) => b.transferCount - a.transferCount);
+        
+        // For client-side fallback, use current time
+        const fetchTime = Date.now();
+        setUsers(enriched);
+        setLastFetchTime(fetchTime);
+        localStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({ timestamp: fetchTime, users: enriched } satisfies CachePayload)
+        );
       }
-      const fetchTime = Date.now();
-      setUsers(enriched);
-      setLastFetchTime(fetchTime);
-      localStorage.setItem(
-        CACHE_KEY,
-        JSON.stringify({ timestamp: fetchTime, users: enriched } satisfies CachePayload)
-      );
 
       // 5. Optional AI analysis
       setLoading('Generating community vibe …');
