@@ -9,12 +9,17 @@ if (!API_BASE) {
 interface BackendResponse {
   cached: boolean;
   updatedAt: number;
-  data: Array<{ walletAddress: string; transferCount: number }>;
+  data: Array<{ 
+    walletAddress: string; 
+    transferCount: number;
+    username: string | null;
+    avatar: string | null;
+    profileUrl: string | null;
+  }>;
 }
 
 /**
- * Fetch leaderboard data from backend (Railway) and return as UserRecord[] with wallet + count only.
- * Profile enrichment still happens client-side to keep backend lightweight.
+ * Fetch leaderboard data from backend (Railway) with profiles already enriched.
  */
 export async function getLeaderboardFromBackend(): Promise<BackendResponse | null> {
   if (!API_BASE) return null;

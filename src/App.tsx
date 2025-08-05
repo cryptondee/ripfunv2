@@ -30,8 +30,10 @@ export default function App() {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<string | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<number | null>(null);
+  const [currentTime, setCurrentTime] = useState<number>(Date.now());
 
-  /** Loads cached results if < 1h old */
+  /** Loads cached results if < 1h old, or fetches from server */
   useEffect(() => {
     const cacheStr = localStorage.getItem(CACHE_KEY);
     if (cacheStr) {
@@ -39,63 +41,91 @@ export default function App() {
         const cache: CachePayload = JSON.parse(cacheStr);
         if (Date.now() - cache.timestamp < 1000 * 60 * 60) {
           setUsers(cache.users);
+          setLastFetchTime(cache.timestamp);
+          return;
         }
       } catch (_) {
         /* ignore bad cache */
       }
     }
+    // No valid cache, fetch from server immediately
+    fetchLeaderboard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Update current time every second for countdown timer */
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchLeaderboard = useCallback(async () => {
+    // Check cooldown period
+    if (lastFetchTime && Date.now() - lastFetchTime < 1000 * 60 * 60) {
+      const remainingMinutes = Math.ceil((1000 * 60 * 60 - (Date.now() - lastFetchTime)) / (1000 * 60));
+      setError(`Please wait ${remainingMinutes} more minute(s) before refreshing.`);
+      return;
+    }
+
     setLoading('Fetching transfers…');
     setError(null);
     setAnalysis(null);
     try {
-      // 1. Try backend first
-      let addressCounts: Map<string, number>;
+      // 1. Try backend first (with profiles already enriched)
       const backendResp = await getLeaderboardFromBackend();
+      let enriched: UserRecord[];
+      
       if (backendResp && backendResp.data.length) {
-        addressCounts = new Map(
-          backendResp.data.map((e) => [e.walletAddress, e.transferCount] as const)
-        );
+        // Use backend data directly (already enriched)
+        setLoading('Loading from server…');
+        enriched = backendResp.data.map(entry => ({
+          walletAddress: entry.walletAddress,
+          username: entry.username,
+          avatar: entry.avatar,
+          profileUrl: entry.profileUrl,
+          transferCount: entry.transferCount
+        }));
       } else {
-        // Fallback to client-side aggregation
-        addressCounts = await getRecipientAddresses({
+        // Fallback to client-side aggregation + enrichment
+        setLoading('Fetching transfers…');
+        const addressCounts = await getRecipientAddresses({
           contractAddress: NFT_CONTRACT_ADDRESS,
           fromAddress: MINT_FROM_ADDRESS
         });
-      }
 
-      // 2. Sort addresses by count desc
-      const sortedAddrs = Array.from(addressCounts.entries())
-        .sort((a, b) => b[1] - a[1])
-        .map(([address]) => address);
+        // Sort addresses by count desc
+        const sortedAddrs = Array.from(addressCounts.entries())
+          .sort((a, b) => b[1] - a[1])
+          .map(([address]) => address);
 
-      // 3. Batch enrich profiles (20 at a time)
-      const batchSize = 20;
-      const enriched: UserRecord[] = [];
-      for (let i = 0; i < sortedAddrs.length; i += batchSize) {
-        setLoading(`Enriching profiles ${i} / ${sortedAddrs.length}`);
-        const slice = sortedAddrs.slice(i, i + batchSize);
-        const profiles = await getRipFunProfiles(slice);
-        slice.forEach((addr) => {
-          const profile = profiles.get(addr);
-          enriched.push({
-            walletAddress: addr,
-            username: profile?.username || null,
-            avatar: profile?.avatar || null,
-            profileUrl: profile?.profileUrl || null,
-            transferCount: addressCounts.get(addr) || 0
+        // Batch enrich profiles (20 at a time)
+        const batchSize = 20;
+        enriched = [];
+        for (let i = 0; i < sortedAddrs.length; i += batchSize) {
+          setLoading(`Enriching profiles ${i} / ${sortedAddrs.length}`);
+          const slice = sortedAddrs.slice(i, i + batchSize);
+          const profiles = await getRipFunProfiles(slice);
+          slice.forEach((addr) => {
+            const profile = profiles.get(addr);
+            enriched.push({
+              walletAddress: addr,
+              username: profile?.username || null,
+              avatar: profile?.avatar || null,
+              profileUrl: profile?.profileUrl || null,
+              transferCount: addressCounts.get(addr) || 0
+            });
           });
-        });
-      }
+        }
 
-      // 4. Sort enriched list
-      enriched.sort((a, b) => b.transferCount - a.transferCount);
+        // Sort enriched list
+        enriched.sort((a, b) => b.transferCount - a.transferCount);
+      }
+      const fetchTime = Date.now();
       setUsers(enriched);
+      setLastFetchTime(fetchTime);
       localStorage.setItem(
         CACHE_KEY,
-        JSON.stringify({ timestamp: Date.now(), users: enriched } satisfies CachePayload)
+        JSON.stringify({ timestamp: fetchTime, users: enriched } satisfies CachePayload)
       );
 
       // 5. Optional AI analysis
@@ -108,18 +138,48 @@ export default function App() {
     } finally {
       setLoading(null);
     }
-  }, []);
+  }, [lastFetchTime]);
+
+  // Helper to calculate remaining cooldown time
+  const getCooldownInfo = () => {
+    if (!lastFetchTime) return { isInCooldown: false, remainingMs: 0 };
+    const cooldownPeriod = 1000 * 60 * 60; // 1 hour
+    const elapsed = currentTime - lastFetchTime;
+    const remainingMs = cooldownPeriod - elapsed;
+    return {
+      isInCooldown: remainingMs > 0,
+      remainingMs: Math.max(0, remainingMs)
+    };
+  };
+
+  const { isInCooldown, remainingMs } = getCooldownInfo();
+  const remainingMinutes = Math.ceil(remainingMs / (1000 * 60));
+  const remainingSeconds = Math.ceil((remainingMs % (1000 * 60)) / 1000);
 
   return (
     <div className="flex flex-col min-h-screen px-4 py-6 md:px-8">
-      <Header onRefresh={fetchLeaderboard} />
+      <Header 
+        onRefresh={fetchLeaderboard} 
+        isInCooldown={isInCooldown}
+        remainingMinutes={remainingMinutes}
+        remainingSeconds={remainingSeconds}
+      />
       {loading && <Loader message={loading} />}
       {error && (
         <div className="bg-red-600/20 border border-red-600 text-red-300 p-4 rounded mt-4">
           {error}
         </div>
       )}
-      {users && <ResultsTable users={users} />}
+      {users && (
+        <>
+          {lastFetchTime && (
+            <div className="text-center text-gray-400 text-sm mb-4">
+              Last updated: {new Date(lastFetchTime).toLocaleString()}
+            </div>
+          )}
+          <ResultsTable users={users} />
+        </>
+      )}
       {analysis && <CommunityAnalysis text={analysis} />}
       {!users && !loading && (
         <button onClick={fetchLeaderboard} className="self-center bg-rip-green text-black font-bold px-4 py-2 mt-8 rounded shadow hover:scale-105 transition">
