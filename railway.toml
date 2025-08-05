@@ -1,5 +1,8 @@
 [build]
 builder = "nixpacks"
 
+[build.buildCommand]
+buildCommand = "npm run build"
+
 [deploy]
-startCommand = "npm run build:backend && npm start"
+staticPublishPath = "dist"
