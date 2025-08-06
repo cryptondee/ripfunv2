@@ -13,7 +13,7 @@ export default function ResultsTable({ users }: Props) {
           <tr className="bg-gray-800/60 backdrop-blur">
             <th className="py-3 px-4">#</th>
             <th className="py-3 px-4">User</th>
-            <th className="py-3 px-4">Transfers</th>
+            <th className="py-3 px-4">Packs</th>
             <th className="py-3 px-4">Wallet</th>
           </tr>
         </thead>
